@@ -1,3 +1,5 @@
+![example.png](example.png)
+
 # Serial Port Connector
 
 Serial Port Connector is a Python application that facilitates serial communication through a simple GUI. Users can connect to available serial ports, configure the baud rate, and send/receive messages to/from connected serial devices.
