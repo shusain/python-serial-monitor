@@ -29,6 +29,7 @@ def open_connection():
 
 def start_read_thread():
     read_thread = Thread(target=read_from_port, args=(ser,))
+    read_thread.daemon = True
     read_thread.start()
 
 def read_from_port(serial_instance):
@@ -64,16 +65,50 @@ def plot_data():
     fig.autofmt_xdate()  # Rotate and format x-axis labels for better readability
     canvas.draw()
 
-def send_message():
-    message = input_entry.get()
-    if ser and ser.is_open and message:
+def send_gcode(command):
+    if not ser or not ser.is_open:
+        messagebox.showwarning("Serial Not Connected", "Open a serial connection before sending commands.")
+        return
+
+    if command:
+        payload = command
+        if not payload.endswith('\n') and not payload.endswith('\r'):
+            payload += '\r\n'
+
         try:
-            ser.write(message.encode('utf-8'))
-            output_text.insert(tk.END, f"Sent: {message}\n")
+            ser.write(payload.encode('utf-8'))
+            output_text.insert(tk.END, f"Sent: {command}\n")
             output_text.yview(tk.END)
         except Exception as e:
-            messagebox.showerror("Serial Communication Error", f"Failed to send message: {e}")
+            messagebox.showerror("Serial Communication Error", f"Failed to send command: {e}")
 
+
+def send_message(event=None):
+    message = input_entry.get()
+    if message:
+        send_gcode(message)
+
+
+def send_estop():
+    send_gcode('M112')
+
+
+def home_axis(axis):
+    send_gcode(f'G28 {axis}')
+
+
+def jog_axis(direction):
+    try:
+        amount = float(jog_amount_var.get())
+    except ValueError:
+        messagebox.showerror("Invalid Amount", "Enter a numeric jog amount.")
+        return
+
+    axis = jog_axis_var.get()
+    delta = amount if direction == 'positive' else -amount
+    send_gcode('G91')
+    send_gcode(f'G0 {axis}{delta} F3000')
+    send_gcode('G90')
 
 
 # Get a list of available serial ports and baud rates
@@ -112,6 +147,7 @@ input_entry.grid(column=1, row=4, padx=5, pady=5, sticky=tk.W)
 
 send_button = ttk.Button(root, text="Send Message", command=send_message)
 send_button.grid(column=2, row=4, padx=5, pady=5)
+input_entry.bind('<Return>', send_message)
 
 output_text = tk.Text(root, wrap='word', width=50, height=10)
 output_text.grid(column=0, row=5, columnspan=3, padx=5, pady=5)
@@ -119,6 +155,47 @@ output_text.grid(column=0, row=5, columnspan=3, padx=5, pady=5)
 parse_json_var = tk.BooleanVar(value=False)
 parse_json_cb = ttk.Checkbutton(root, text='Parse serial data as JSON and plot', variable=parse_json_var)
 parse_json_cb.grid(column=0, row=6, columnspan=3, padx=5, pady=5)
+
+# Marlin controls
+jog_axis_var = tk.StringVar(value='X')
+jog_amount_var = tk.StringVar(value='10')
+
+marlin_frame = ttk.LabelFrame(root, text='Marlin Utility Controls')
+marlin_frame.grid(column=0, row=7, columnspan=3, padx=5, pady=5, sticky='ew')
+
+estop_button = ttk.Button(marlin_frame, text='Emergency Stop', command=send_estop)
+estop_button.grid(column=4, row=0, rowspan=2, padx=5, pady=5, sticky='nsew')
+
+home_label = ttk.Label(marlin_frame, text='Homing:')
+home_label.grid(column=0, row=0, padx=5, pady=5, sticky=tk.W)
+
+home_x_button = ttk.Button(marlin_frame, text='Home X', command=lambda: home_axis('X'))
+home_x_button.grid(column=1, row=0, padx=2, pady=5)
+home_y_button = ttk.Button(marlin_frame, text='Home Y', command=lambda: home_axis('Y'))
+home_y_button.grid(column=2, row=0, padx=2, pady=5)
+home_z_button = ttk.Button(marlin_frame, text='Home Z', command=lambda: home_axis('Z'))
+home_z_button.grid(column=3, row=0, padx=2, pady=5)
+
+jog_label = ttk.Label(marlin_frame, text='Jogging:')
+jog_label.grid(column=0, row=2, padx=5, pady=5, sticky=tk.W)
+
+axis_x_radio = ttk.Radiobutton(marlin_frame, text='X', variable=jog_axis_var, value='X')
+axis_x_radio.grid(column=1, row=2, padx=2, pady=5)
+axis_y_radio = ttk.Radiobutton(marlin_frame, text='Y', variable=jog_axis_var, value='Y')
+axis_y_radio.grid(column=2, row=2, padx=2, pady=5)
+axis_z_radio = ttk.Radiobutton(marlin_frame, text='Z', variable=jog_axis_var, value='Z')
+axis_z_radio.grid(column=3, row=2, padx=2, pady=5)
+
+amount_label = ttk.Label(marlin_frame, text='Amount:')
+amount_label.grid(column=0, row=3, padx=5, pady=5, sticky=tk.W)
+
+jog_amount_entry = ttk.Entry(marlin_frame, width=10, textvariable=jog_amount_var)
+jog_amount_entry.grid(column=1, row=3, padx=2, pady=5)
+
+jog_pos_button = ttk.Button(marlin_frame, text='↑', command=lambda: jog_axis('positive'))
+jog_pos_button.grid(column=2, row=3, padx=2, pady=5)
+jog_neg_button = ttk.Button(marlin_frame, text='↓', command=lambda: jog_axis('negative'))
+jog_neg_button.grid(column=3, row=3, padx=2, pady=5)
 
 
 def rescan_serial_ports():
@@ -132,6 +209,6 @@ rescan_serial_ports()
 fig, ax = plt.subplots(figsize=(5, 4))
 canvas = FigureCanvasTkAgg(fig, master=root)
 canvas_widget = canvas.get_tk_widget()
-canvas_widget.grid(column=0, row=7, columnspan=3, padx=5, pady=5)
+canvas_widget.grid(column=0, row=8, columnspan=3, padx=5, pady=5)
 # Start the Tkinter event loop
 root.mainloop()
