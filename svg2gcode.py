@@ -323,7 +323,9 @@ def circle_to_gcode(cx, cy, r, scale, tx, ty, flip_y, pen_down_z, pen_up_z, feed
     return lines
 
 
-def convert_svg_to_gcode(svgfile, output=None, page='8.5x11', units='in', resolution=0.5, pen_up=5.0, pen_down=0.0, feed=1500.0, rapid_feed=3000.0, no_scale=False, no_offset=False, arc_circles=False, arc_paths=False, simplify=0.0, write_output=True):
+def convert_svg_to_gcode(svgfile, output=None, page='8.5x11', units='in', resolution=0.5, pen_up=5.0, pen_down=0.0, feed=1500.0, rapid_feed=3000.0, no_scale=False, no_offset=False, arc_circles=False, arc_paths=False, simplify=0.0, write_output=True, tool_width=0.0, cutting_mode=False):
+    # tool_width and cutting_mode params for future cutting/offsetting support
+    # For now they are accepted but not used; path offsetting can be added later
     page_w_in, page_h_in = parse_page_size(page, default_units=units)
     page_w_mm = page_w_in * MM_PER_INCH
     page_h_mm = page_h_in * MM_PER_INCH
